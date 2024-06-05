@@ -1,0 +1,35 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'Country', choices: ['na','eu'], description: 'Select country/region to deploy in')
+        choice(name: 'ENV', choices: ['dev', 'test', 'stage'], description: 'Select env in which to deploy')
+    }
+    stages {
+
+        stage ('Copying environment file outside') {
+            steps {
+                sh(
+                    """
+                    #!/bin/bash
+                    set -e
+                    cp ${ENV}/* .
+                    cp ${ENV}_tfvars/${COUNTRY}/* .
+                    """
+                )
+            }   
+        }
+
+        stage ('Initailising backend') {
+            steps {
+                sh 'terraform init -backend-config="prefix=backend/viq-st-${COUNTRY}-$(echo $ENV | head -c 1)"'
+            }
+        }
+
+        stage ('Infrastructure apply') {
+            steps {
+                sh "'terraform apply -auto-approve'"
+            }
+        }
+    }
+}
