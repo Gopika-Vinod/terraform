@@ -1,0 +1,110 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: ${SERVICE_NAME}
+  namespace: ${PROJECT_NUMBER}
+  labels:
+    cloud.googleapis.com/location: ${REGION}
+  annotations:
+    # GA: features are open to all developers and are considered stable and fully qualified for production use.
+    # BETA: to use Preview features
+    run.googleapis.com/launch-stage: BETA 
+    # Internal and Cloud Load Balancing: Accept requests from an external HTTP(S) load balancer but not directly from the internet.
+    run.googleapis.com/ingress: internal-and-cloud-load-balancing
+spec:
+  template:
+    metadata:
+      annotations:
+        # By default, container instances have min-instances turned off, with a setting of 0
+        # number of container instances to be kept warm and ready to serve requests. 
+        # Instances kept running using the minimum instances feature do incur billing costs.
+        autoscaling.knative.dev/minScale: ${MIN_INSTANCES}
+        # By default, Cloud Run services are configured to scale out to a maximum of 100 instances.
+        # Use this setting as a way to control your costs or to limit the number of connections to a backing service, such as to a database.
+        autoscaling.knative.dev/maxScale: ${MAX_INSTANCES}
+        # true to set CPU allocation only during request processing, or false to set CPU to always allocated.
+        # If you are choosing the always-allocated CPU option, you must specify at least 512MiB of memory.
+        # Selecting CPU always allocated allows you to execute short-lived background tasks and other asynchronous processing work after returning responses.
+        run.googleapis.com/cpu-throttling: ${CPU_ALLOCATION}
+        # provides additional CPU during container instance startup time.
+        # The actual CPU boost varies depending on your CPU limit settings
+        # Preview
+        run.googleapis.com/startup-cpu-boost: 'true'
+        # By default, session affinity is not enabled, so requests from the same client might be handled by different container instances
+        # Preview
+        run.googleapis.com/sessionAffinity: 'false' 
+        run.googleapis.com/cloudsql-instances: CLOUD_SQL_CONNECTION
+        # If you use second generation, you must also specify at least 512 MiB of memory.
+        # https://cloud.google.com/run/docs/about-execution-environments
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/vpc-access-connector: ${SERVERLESS_VPC_CONNECTOR}
+        # all-traffic: Sends all outbound traffic through the connector.
+        # private-ranges-only: Sends only traffic to internal addresses through the VPC connector.
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      # maximum number of requests that can be processed simultaneously by a given container instance. 
+      # By default each Cloud Run container instance can receive up to 80 requests at the same time; you can increase this to a maximum of 1000.
+      # if your code cannot process parallel requests, set concurrency to 1.
+      containerConcurrency: ${MAX_CONCURRENCY}
+      # the time within which a response must be returned by services deployed to Cloud Run. If a response isn't returned within the time specified, the request ends and error 504 is returned.
+      # The timeout is set by default to 5 minutes and can be extended up to 60 minutes.
+      timeoutSeconds: 300
+      serviceAccountName: ${SERVICE_ACCOUNT_EMAIL}
+      containers:
+      - image: ${IMAGE}
+        ports:
+        - name: HTTP1
+          containerPort: ${PORT}
+        env:
+        - name: KEY
+          value: VALUE
+        - name: KEY
+          value: VALUE
+        resources:
+          limits:
+            cpu: ${CPU_LIMIT}
+            memory: ${MEMORY_LIMIT}
+        volumeMounts:
+        - name: VOLUME_NAME
+          readOnly: true
+          mountPath: MOUNT_PATH
+        startupProbe:
+          httpGet:
+            path: CHECK_PATH
+            httpHeaders:
+              - name: HEADER_NAME
+                value: HEADER_VALUE
+          tcpSocket:
+            port: PORT
+          grpc:
+            service: GRPC_SERVICE
+          initialDelaySeconds: DELAY
+          timeoutSeconds: TIMEOUT
+          failureThreshold: THRESHOLD
+          periodSeconds: PERIOD
+        livenessProbe:
+          httpGet:
+            path: CHECK_PATH
+            httpHeaders:
+              - name: HEADER_NAME
+                value: HEADER_VALUE
+          grpc:
+            service: GRPC_SERVICE
+          initialDelaySeconds: DELAY
+          timeoutSeconds: TIMEOUT
+          failureThreshold: THRESHOLD
+          periodSeconds: PERIOD
+      volumes:
+      - name: VOLUME_NAME
+        secret:
+          secretName: SECRET
+          items:
+          - key: SECRET_VERSION
+            path: PATH
+  traffic:
+  - percent: PERCENT_TO_LATEST
+    latestRevision: true
+  - percent: PERCENT_TO_REVISION
+    revisionName: REVISION_NAME
+  - tag: TAG
+    revisionName: REVISION_NAME
